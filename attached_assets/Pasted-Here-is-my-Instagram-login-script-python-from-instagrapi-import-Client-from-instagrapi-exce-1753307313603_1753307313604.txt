@@ -1,0 +1,71 @@
+Here is my Instagram‑login script:
+
+```python
+from instagrapi import Client
+from instagrapi.exceptions import TwoFactorRequired, ChallengeRequired
+import pathlib
+
+# 1. Ask for your username/password
+username = input("🕤 Instagram username: ").strip()
+password = input("🔒 Instagram password: ").strip()
+
+# 2. Where to save your session
+SESSION_FILE = pathlib.Path(f"{username}_session.json")
+
+# 3. Make the bot and tell it how to ask you for codes
+bot = Client()
+bot.challenge_code_handler = lambda u, m: input(f"📨 Code via {m.upper()}: ")
+
+# 4. Reuse or clear old session
+if SESSION_FILE.exists():
+    ans = input(f"🗂 Found '{SESSION_FILE.name}'. Delete and log in fresh? (y/N): ").lower()
+    if ans == 'y':
+        SESSION_FILE.unlink()
+    else:
+        print("🔁 Reusing saved session...")
+        bot.load_settings(str(SESSION_FILE))
+
+# 5. Log in (only if we don’t already have a user_id)
+if not bot.user_id:
+    print("🔐 Logging in…")
+    try:
+        bot.login(username, password)
+    except TwoFactorRequired:
+        code = input("🔐 Enter 2FA code: ")
+        bot.two_factor_login(code)
+    except ChallengeRequired:
+        print("⚠️ Challenge required — requesting methods…")
+        ch = bot.get_challenge()
+        choices = ch.get("step_data", {}).get("choice", [])
+        if choices:
+            for i, m in enumerate(choices, 1):
+                print(f"  {i}: {m}")
+            idx = int(input("Choose a method number: ")) - 1
+        else:
+            idx = 0
+        bot.challenge_send_code(idx)
+        code = input("📨 Enter the challenge code you received: ")
+        bot.challenge_code(code)
+        print("🔁 Logging in again after challenge…")
+        bot.login(username, password)
+
+# 6. Save the session file
+bot.dump_settings(str(SESSION_FILE))
+print(f"✅ Logged in and session saved to {SESSION_FILE.name}")
+Please build a React frontend that:
+
+Uses Create React App to set up the project.
+
+Shows text inputs for Instagram username and password, plus a Login button.
+
+If \<username>_session.json already exists on the server, pops up “Reuse saved session?” with Yes/No choices.
+
+On clicking Login, calls a backend API endpoint (e.g. POST /api/login) to run the above script logic:
+
+If Instagram asks for 2FA, show a modal to enter the 2FA code.
+
+If Instagram triggers a challenge, show a modal to choose SMS or email, then another input for the code.
+
+After successful login, display “Login successful!”; on error, show the error text in a status area.
+
+Keep the UI clean and simple with clear labels, buttons, and modals—no extra styling needed.
