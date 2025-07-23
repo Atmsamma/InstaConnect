@@ -56,7 +56,7 @@ export async function instagramLogin(params: LoginParams): Promise<LoginResult> 
       args.push("challenge", challengeMethod, challengeCode);
     }
 
-    const pythonProcess = spawn("python3", args, {
+    const pythonProcess = spawn("python", args, {
       stdio: ["pipe", "pipe", "pipe"]
     });
 
