@@ -1,12 +1,18 @@
+
 #!/usr/bin/env python3
 import sys
 import json
 import pathlib
 import os
 
+def log(*args):
+    # everything you log here goes to stderr, not to stdout
+    print(*args, file=sys.stderr)
+
 def main():
     if len(sys.argv) < 3:
-        print(json.dumps({"success": False, "message": "Username and password required"}))
+        result = {"success": False, "message": "Username and password required"}
+        print(json.dumps(result))
         sys.exit(1)
     
     username = sys.argv[1]
@@ -52,37 +58,39 @@ def main():
         if SESSION_FILE.exists():
             if reuse_session is None:
                 # Session exists but no preference given
-                print(json.dumps({
+                result = {
                     "success": False,
                     "sessionExists": True,
                     "sessionFile": SESSION_FILE.name
-                }))
+                }
+                print(json.dumps(result))
                 sys.exit(0)
             elif reuse_session:
-                print("🔁 Reusing saved session...")
+                log("🔁 Reusing saved session...")
                 bot.load_settings(str(SESSION_FILE))
             else:
-                print("🗂 Deleting old session for fresh login...")
+                log("🗂 Deleting old session for fresh login...")
                 SESSION_FILE.unlink()
         
         # Login if needed
         if not bot.user_id:
-            print("🔐 Logging in…")
+            log("🔐 Logging in…")
             try:
                 bot.login(username, password)
             except TwoFactorRequired:
                 if two_factor_code:
                     bot.two_factor_login(two_factor_code)
                 else:
-                    print(json.dumps({
+                    result = {
                         "success": False,
                         "requiresTwoFactor": True,
                         "message": "Two-factor authentication required"
-                    }))
+                    }
+                    print(json.dumps(result))
                     sys.exit(0)
             except ChallengeRequired:
                 if challenge_method and challenge_code:
-                    print("⚠️ Processing challenge...")
+                    log("⚠️ Processing challenge...")
                     ch = bot.get_challenge()
                     choices = ch.get("step_data", {}).get("choice", [])
                     
@@ -94,10 +102,10 @@ def main():
                     
                     bot.challenge_send_code(idx)
                     bot.challenge_code(challenge_code)
-                    print("🔁 Logging in again after challenge…")
+                    log("🔁 Logging in again after challenge…")
                     bot.login(username, password)
                 else:
-                    print("⚠️ Challenge required — requesting methods…")
+                    log("⚠️ Challenge required — requesting methods…")
                     ch = bot.get_challenge()
                     choices = ch.get("step_data", {}).get("choice", [])
                     
@@ -108,32 +116,36 @@ def main():
                         elif "email" in choice.lower():
                             challenge_methods.append({"type": "email", "destination": "u***@example.com"})
                     
-                    print(json.dumps({
+                    result = {
                         "success": False,
                         "requiresChallenge": True,
                         "challengeMethods": challenge_methods,
                         "message": "Security challenge required"
-                    }))
+                    }
+                    print(json.dumps(result))
                     sys.exit(0)
         
         # Save session and return success
         bot.dump_settings(str(SESSION_FILE))
-        print(json.dumps({
+        result = {
             "success": True,
             "message": f"✅ Logged in and session saved to {SESSION_FILE.name}"
-        }))
+        }
+        print(json.dumps(result))
         
     except ImportError:
-        print(json.dumps({
+        result = {
             "success": False,
             "message": "instagrapi package not installed. Please run: pip install instagrapi"
-        }))
+        }
+        print(json.dumps(result))
         sys.exit(1)
     except Exception as e:
-        print(json.dumps({
+        result = {
             "success": False,
             "message": f"Login failed: {str(e)}"
-        }))
+        }
+        print(json.dumps(result))
         sys.exit(1)
 
 if __name__ == "__main__":

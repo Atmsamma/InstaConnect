@@ -23,10 +23,10 @@ interface LoginResult {
 
 export async function instagramLogin(params: LoginParams): Promise<LoginResult> {
   const { username, password, reuseSession, twoFactorCode, challengeMethod, challengeCode } = params;
-  
+
   const scriptPath = path.join(process.cwd(), "server", "instagram_login.py");
   const sessionFile = `${username}_session.json`;
-  
+
   // Check if session file exists
   try {
     await fs.access(sessionFile);
@@ -43,15 +43,15 @@ export async function instagramLogin(params: LoginParams): Promise<LoginResult> 
 
   return new Promise((resolve, reject) => {
     const args = [scriptPath, username, password];
-    
+
     if (reuseSession !== undefined) {
       args.push(reuseSession ? "reuse" : "fresh");
     }
-    
+
     if (twoFactorCode) {
       args.push("2fa", twoFactorCode);
     }
-    
+
     if (challengeMethod && challengeCode) {
       args.push("challenge", challengeMethod, challengeCode);
     }
@@ -82,7 +82,7 @@ export async function instagramLogin(params: LoginParams): Promise<LoginResult> 
       } else {
         // Parse error output for specific scenarios
         const errorOutput = stderr.toLowerCase();
-        
+
         if (errorOutput.includes("two-factor") || errorOutput.includes("2fa")) {
           resolve({
             success: false,
