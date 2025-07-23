@@ -26,7 +26,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{
+  const [statusMessage, setStatusMessage<{
     type: "success" | "error" | "info";
     message: string;
   } | null>(null);
@@ -36,9 +36,9 @@ export default function LoginPage() {
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [showChallengeMethodModal, setShowChallengeMethodModal] = useState(false);
   const [showChallengeCodeModal, setShowChallengeCodeModal] = useState(false);
-  const [challengeMethods, setChallengeMethods] = useState<Array<{ type: string; destination: string }>>([]);
-  const [selectedChallengeMethod, setSelectedChallengeMethod] = useState<string>("");
-  const [sessionFile, setSessionFile] = useState<string>("");
+  const [challengeMethods, setChallengeMethods<Array<{ type: string; destination: string }>>] = useState([]);
+  const [selectedChallengeMethod, setSelectedChallengeMethod: string] = useState("");
+  const [sessionFile, setSessionFile: string] = useState("");
 
   const { toast } = useToast();
 
@@ -49,21 +49,30 @@ export default function LoginPage() {
     },
     onSuccess: (data) => {
       if (data.success) {
-        setStatusMessage({ type: "success", message: data.message || "Login successful!" });
-        setShow2FAModal(false);
-        setShowChallengeCodeModal(false);
-        setShowChallengeMethodModal(false);
-        setShowSessionModal(false);
-      } else if (data.sessionExists) {
-        setSessionFile(data.sessionFile || "");
-        setShowSessionModal(true);
-      } else if (data.requiresTwoFactor) {
-        setShow2FAModal(true);
-        setStatusMessage({ type: "info", message: "Two-factor authentication required" });
-      } else if (data.requiresChallenge) {
-        setChallengeMethods(data.challengeMethods || []);
-        setShowChallengeMethodModal(true);
-        setStatusMessage({ type: "info", message: "Security challenge required" });
+          setStatusMessage({
+            type: "success",
+            message: data.message || "Login successful!"
+          });
+          toast({
+            title: "Success",
+            description: "Successfully logged in to Instagram!",
+          });
+          // Redirect to dashboard after successful login
+          setTimeout(() => {
+            window.location.href = "/dashboard";
+          }, 1500);
+        } else {
+        if (data.sessionExists) {
+          setSessionFile(data.sessionFile || "");
+          setShowSessionModal(true);
+        } else if (data.requiresTwoFactor) {
+          setShow2FAModal(true);
+          setStatusMessage({ type: "info", message: "Two-factor authentication required" });
+        } else if (data.requiresChallenge) {
+          setChallengeMethods(data.challengeMethods || []);
+          setShowChallengeMethodModal(true);
+          setStatusMessage({ type: "info", message: "Security challenge required" });
+        }
       }
     },
     onError: (error) => {
