@@ -26,7 +26,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [statusMessage, setStatusMessage<{
+  const [statusMessage, setStatusMessage] = useState<{
     type: "success" | "error" | "info";
     message: string;
   } | null>(null);
@@ -36,9 +36,9 @@ export default function LoginPage() {
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [showChallengeMethodModal, setShowChallengeMethodModal] = useState(false);
   const [showChallengeCodeModal, setShowChallengeCodeModal] = useState(false);
-  const [challengeMethods, setChallengeMethods<Array<{ type: string; destination: string }>>] = useState([]);
-  const [selectedChallengeMethod, setSelectedChallengeMethod: string] = useState("");
-  const [sessionFile, setSessionFile: string] = useState("");
+  const [challengeMethods, setChallengeMethods] = useState<Array<{ type: string; destination: string }>>([]);
+  const [selectedChallengeMethod, setSelectedChallengeMethod] = useState<string>("");
+  const [sessionFile, setSessionFile] = useState<string>("");
 
   const { toast } = useToast();
 
