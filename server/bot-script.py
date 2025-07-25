@@ -42,14 +42,16 @@ def get_video_duration(video_url):
         url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
         log(f"🔍 Getting duration for: {url_str[:100]}...")
 
-        # Use ffmpeg to get video info
+        # Use ffmpeg to get video info - remove -v quiet to see output
         cmd = [
-            "ffmpeg", "-i", url_str, "-f", "null", "-", "-hide_banner", "-v", "quiet", "-stats"
+            "ffmpeg", "-i", url_str, "-f", "null", "-", "-hide_banner"
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
         # Parse ffmpeg output for duration (appears in stderr)
         output = result.stderr
+        log(f"🔍 ffmpeg stderr output: {output[:200]}...")  # Debug log
+        
         for line in output.split('\n'):
             if 'Duration:' in line:
                 duration_str = line.split('Duration: ')[1].split(',')[0].strip()
@@ -63,11 +65,24 @@ def get_video_duration(video_url):
                     log(f"✅ Video duration: {total_seconds} seconds")
                     return total_seconds
 
-        log(f"❌ Could not extract duration from ffmpeg output")
+        # If Duration line not found, try alternative approach using ffprobe
+        log("⚠️ No Duration found in ffmpeg output, trying ffprobe...")
+        cmd = [
+            "ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", url_str
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0 and result.stdout.strip():
+            duration = float(result.stdout.strip())
+            log(f"✅ Video duration (ffprobe): {duration} seconds")
+            return duration
+
+        log(f"❌ Could not extract duration from either ffmpeg or ffprobe")
         return None
 
     except subprocess.TimeoutExpired:
-        log("❌ ffmpeg timeout - video URL may be inaccessible")
+        log("❌ Timeout - video URL may be inaccessible")
         return None
     except Exception as e:
         log(f"❌ Error getting video duration: {e}")
