@@ -23,7 +23,7 @@ def save_json(filename, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # Triggers for the bot to respond to
-TRIGGERS = ["help", "question", "support", "issue", "problem"]
+TRIGGERS = ["whereclipped", "cliplive"]
 
 def main():
     # Find the session file
