@@ -15,6 +15,39 @@ def log(*args):
     print(*args, file=sys.stderr, flush=True)
 
 
+def cleanup_screenshots(screenshot_paths):
+    """Clean up screenshot files and directories to save storage space"""
+    if not screenshot_paths:
+        return
+        
+    log("🗑️ Cleaning up screenshot files...")
+    
+    directories_to_check = set()
+    
+    for screenshot_path in screenshot_paths:
+        try:
+            if os.path.exists(screenshot_path):
+                os.remove(screenshot_path)
+                log(f"🗑️ Deleted {screenshot_path}")
+                
+                # Add parent directory to check for cleanup
+                parent_dir = os.path.dirname(screenshot_path)
+                directories_to_check.add(parent_dir)
+        except Exception as e:
+            log(f"⚠️ Could not delete {screenshot_path}: {e}")
+    
+    # Remove empty directories
+    for directory in directories_to_check:
+        try:
+            if os.path.exists(directory) and not os.listdir(directory):
+                os.rmdir(directory)
+                log(f"🗑️ Removed empty directory {directory}")
+        except Exception as e:
+            log(f"⚠️ Could not remove directory {directory}: {e}")
+    
+    log("✅ Screenshot cleanup complete")
+
+
 def load_json(filename):
     try:
         with open(filename, "r", encoding="utf-8") as f:
@@ -36,38 +69,91 @@ def save_json(filename, data):
 
 
 def extract_screenshots(video_url, output_dir, num_screenshots=5):
-    """Extract 5 screenshots from video at fixed intervals using ffmpeg"""
+    """Extract 5 screenshots from video by downloading first, then processing"""
     try:
         os.makedirs(output_dir, exist_ok=True)
 
-        # Convert HttpUrl object to string if needed
         url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
         log(f"📹 Extracting {num_screenshots} screenshots from video")
 
-        screenshots = []
-        # Extract screenshots at fixed time intervals: 2s, 5s, 8s, 11s, 14s
-        timestamps = [2, 5, 8, 11, 14]
+        # Download video file first
+        video_file = os.path.join(output_dir, "input_video.mp4")
+        log("⬇️ Downloading video...")
 
-        for i, timestamp in enumerate(timestamps, 1):
-            output_path = os.path.join(output_dir, f"clip_{i}.jpg")
+        try:
+            response = requests.get(url_str, timeout=30)
+            response.raise_for_status()
+
+            with open(video_file, "wb") as f:
+                f.write(response.content)
+
+            file_size = os.path.getsize(video_file)
+            log(f"✅ Download complete ({file_size} bytes)")
+        except Exception as e:
+            log(f"❌ Failed to download video: {e}")
+            return []
+
+        # Get video duration using ffprobe
+        def get_duration(file_path):
+            try:
+                result = subprocess.run(
+                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                     "-of", "default=noprint_wrappers=1:nokey=1", file_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=15
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    return float(result.stdout.strip())
+                return None
+            except Exception as e:
+                log(f"❌ Error getting duration: {e}")
+                return None
+
+        duration = get_duration(video_file)
+        if duration is None:
+            log("❌ Could not get video duration, using fixed timestamps")
+            # Fallback to fixed timestamps
+            timestamps = [2, 5, 8, 11, 14]
+        else:
+            log(f"⏱️ Duration: {duration:.2f} seconds")
+            # Calculate evenly spaced timestamps
+            interval = duration / (num_screenshots + 1)
+            timestamps = [interval * (i + 1) for i in range(num_screenshots)]
+
+        # Take screenshots
+        screenshots = []
+        log("📸 Taking screenshots...")
+
+        for i, ts in enumerate(timestamps, 1):
+            output_path = os.path.join(output_dir, f"screenshot_{i}.jpg")
 
             cmd = [
-                "ffmpeg", "-y", "-ss", str(timestamp), "-i", url_str,
-                "-vframes", "1", "-q:v", "2", output_path, "-hide_banner", "-loglevel", "error"
+                "ffmpeg", "-ss", str(ts), "-i", video_file,
+                "-vframes", "1", "-q:v", "2", output_path,
+                "-y", "-hide_banner", "-loglevel", "error"
             ]
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+
             if result.returncode == 0 and os.path.exists(output_path):
+                file_size = os.path.getsize(output_path)
                 screenshots.append(output_path)
-                log(f"📸 Screenshot {i} saved at {timestamp}s: {output_path}")
+                log(f"🖼️ Saved screenshot_{i}.jpg at {int(ts)}s ({file_size} bytes)")
             else:
-                log(f"❌ ffmpeg error for screenshot {i} at {timestamp}s (code {result.returncode}): {result.stderr.strip()}")
+                log(f"❌ Failed to create screenshot {i} at {int(ts)}s")
+
+        # Clean up downloaded video
+        try:
+            os.remove(video_file)
+            log("🗑️ Cleaned up downloaded video file")
+        except:
+            pass
 
         log(f"✅ Successfully extracted {len(screenshots)} screenshots")
         return screenshots
-    except subprocess.TimeoutExpired:
-        log("❌ ffmpeg timeout during screenshot extraction")
-        return []
+
     except Exception as e:
         log(f"❌ Error extracting screenshots: {e}")
         return []
@@ -254,6 +340,9 @@ def main():
 
                         message_data["analysis_bundle"] = analysis_bundle
                         log(f"📦 Analysis bundle created with {len(analysis_bundle.get('frames', []))} screenshots")
+                        
+                        # Clean up screenshot files after creating the analysis bundle
+                        cleanup_screenshots(media_data.get("screenshots", []))
                 else:
                     log("⚠️ No previous media message found")
 
