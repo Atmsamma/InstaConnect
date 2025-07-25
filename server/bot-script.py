@@ -36,22 +36,51 @@ def save_json(filename, data):
 
 
 def get_video_duration(video_url):
-    """Get video duration using ffmpeg"""
+    """Get video duration from Instagram URL or using ffmpeg"""
     try:
         # Convert HttpUrl object to string if needed
         url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
         log(f"🔍 Getting duration for: {url_str[:100]}...")
 
-        # Use ffmpeg to get video info - remove -v quiet to see output
+        # First try to extract duration from Instagram URL parameters
+        import urllib.parse
+        import base64
+        import json as json_lib
+
+        if 'instagram.com' in url_str and 'efg=' in url_str:
+            try:
+                # Extract the 'efg' parameter which contains encoded video metadata
+                parsed = urllib.parse.urlparse(url_str)
+                params = urllib.parse.parse_qs(parsed.query)
+
+                if 'efg' in params:
+                    efg_encoded = params['efg'][0]
+                    # URL decode
+                    efg_decoded = urllib.parse.unquote(efg_encoded)
+                    log(f"🔍 Decoded efg: {efg_decoded}")
+
+                    # Parse as JSON directly (it's not base64 encoded)
+                    efg_data = json_lib.loads(efg_decoded)
+
+                    if 'duration_s' in efg_data:
+                        duration = float(efg_data['duration_s'])
+                        log(f"✅ Video duration (from URL): {duration} seconds")
+                        return duration
+            except Exception as e:
+                log(f"⚠️ Could not extract duration from URL metadata: {e}")
+
+        # If Instagram URL parsing failed, try simple ffmpeg probe
+        log("🔍 Trying ffmpeg probe...")
         cmd = [
-            "ffmpeg", "-i", url_str, "-f", "null", "-", "-hide_banner"
+            "ffmpeg", "-i", url_str, "-t", "0.1", "-f", "null", "-", 
+            "-hide_banner"
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
 
         # Parse ffmpeg output for duration (appears in stderr)
         output = result.stderr
-        log(f"🔍 ffmpeg stderr output: {output[:200]}...")  # Debug log
-        
+        log(f"🔍 ffmpeg output sample: {output[:300]}...")
+
         for line in output.split('\n'):
             if 'Duration:' in line:
                 duration_str = line.split('Duration: ')[1].split(',')[0].strip()
@@ -72,7 +101,7 @@ def get_video_duration(video_url):
             "-of", "default=noprint_wrappers=1:nokey=1", url_str
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        
+
         if result.returncode == 0 and result.stdout.strip():
             duration = float(result.stdout.strip())
             log(f"✅ Video duration (ffprobe): {duration} seconds")
