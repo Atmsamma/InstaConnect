@@ -1,7 +1,11 @@
+
 import time
 import json
 import sys
 import os
+import subprocess
+import tempfile
+import requests
 from instagrapi import Client
 from instagrapi.exceptions import UnknownError
 import pathlib
@@ -23,6 +27,132 @@ def save_json(filename, data):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def get_video_duration(video_url):
+    """Get video duration using ffprobe"""
+    try:
+        cmd = [
+            "ffprobe", "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", video_url
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            return float(result.stdout.strip())
+        else:
+            log(f"❌ ffprobe error: {result.stderr}")
+            return None
+    except Exception as e:
+        log(f"❌ Error getting video duration: {e}")
+        return None
+
+
+def extract_screenshots(video_url, output_dir, num_screenshots=5):
+    """Extract screenshots from video using ffmpeg"""
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Get video duration
+        duration = get_video_duration(video_url)
+        if not duration:
+            return []
+        
+        screenshots = []
+        # Divide duration into segments and take screenshots at equal intervals
+        interval = duration / (num_screenshots + 1)
+        
+        for i in range(1, num_screenshots + 1):
+            timestamp = interval * i
+            output_path = os.path.join(output_dir, f"clip_{i}.jpg")
+            
+            cmd = [
+                "ffmpeg", "-y", "-ss", str(timestamp), "-i", video_url,
+                "-vframes", "1", "-q:v", "2", output_path
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                screenshots.append(output_path)
+                log(f"📸 Screenshot {i} saved: {output_path}")
+            else:
+                log(f"❌ ffmpeg error for screenshot {i}: {result.stderr}")
+        
+        return screenshots
+    except Exception as e:
+        log(f"❌ Error extracting screenshots: {e}")
+        return []
+
+
+def find_previous_media_message(messages, trigger_msg_index):
+    """Find the media message immediately before the trigger message"""
+    # Look backwards from the trigger message
+    for i in range(trigger_msg_index + 1, len(messages)):
+        msg = messages[i]
+        
+        # Check for various media types
+        if (msg.media_share or msg.clip or 
+            (hasattr(msg, 'item_type') and msg.item_type in ['media_share', 'clip', 'xma_media_share'])):
+            return msg
+    
+    return None
+
+
+def extract_media_data(media_msg, bot):
+    """Extract comprehensive media data from a message"""
+    try:
+        media_data = {
+            "message_id": media_msg.id,
+            "item_type": getattr(media_msg, 'item_type', None),
+            "timestamp": getattr(media_msg, 'timestamp', None),
+            "user_id": media_msg.user_id,
+            "video_url": None,
+            "caption": None,
+            "media_type": None,
+            "duration": None,
+            "screenshots": []
+        }
+        
+        # Get username
+        try:
+            user_info = bot.user_info(media_msg.user_id)
+            media_data["username"] = user_info.username
+        except:
+            media_data["username"] = f"user_{media_msg.user_id}"
+        
+        # Extract media info based on type
+        media_obj = None
+        if media_msg.media_share:
+            media_obj = media_msg.media_share
+        elif media_msg.clip:
+            media_obj = media_msg.clip
+        
+        if media_obj:
+            # Extract video URL
+            if hasattr(media_obj, 'video_url') and media_obj.video_url:
+                media_data["video_url"] = media_obj.video_url
+            elif hasattr(media_obj, 'video_versions') and media_obj.video_versions:
+                media_data["video_url"] = media_obj.video_versions[0].url
+            
+            # Extract other metadata
+            media_data["caption"] = getattr(media_obj, 'caption', {}).get('text', '') if hasattr(media_obj, 'caption') else ''
+            media_data["media_type"] = getattr(media_obj, 'media_type', None)
+            
+            # If we have a video URL, process it
+            if media_data["video_url"]:
+                # Get duration
+                duration = get_video_duration(media_data["video_url"])
+                media_data["duration"] = duration
+                
+                # Extract screenshots
+                output_dir = os.path.join("output", "screenshots", media_msg.id)
+                screenshots = extract_screenshots(media_data["video_url"], output_dir)
+                media_data["screenshots"] = screenshots
+        
+        return media_data
+        
+    except Exception as e:
+        log(f"❌ Error extracting media data: {e}")
+        return None
 
 
 # Triggers for the bot to respond to
@@ -84,29 +214,65 @@ def main():
 
     def handle_new_dm(thread):
         thread_id = thread.id
-        last_seen = replied_tracker.get(thread_id,
-                                        {}).get("last_replied_msg_id")
+        last_seen = replied_tracker.get(thread_id, {}).get("last_replied_msg_id")
 
-        for msg in thread.messages:
+        for i, msg in enumerate(thread.messages):
             if msg.id == last_seen:
                 break  # we've already processed up to here
 
             text = (msg.text or "").lower()
-            if any(t in text for t in TRIGGERS) or msg.media_share:
+            
+            # Check if this is a trigger message
+            triggered_words = [t for t in TRIGGERS if t in text]
+            
+            if triggered_words:
                 username = safe_username(msg.user_id)
-                log(f"💬 Trigger in {thread_id} from @{username}")
+                log(f"💬 Trigger '{triggered_words[0]}' in {thread_id} from @{username}")
 
-                # Store detailed message data
+                # Find the previous media message
+                media_msg = find_previous_media_message(thread.messages, i)
+                
                 message_data = {
-                    "raw_message": json.loads(
-                        json.dumps(vars(msg),
-                                   default=str))  # make it JSON serializable
+                    "trigger_message": {
+                        "id": msg.id,
+                        "text": msg.text,
+                        "user_id": msg.user_id,
+                        "username": username,
+                        "timestamp": getattr(msg, 'timestamp', None),
+                        "triggered_words": triggered_words
+                    },
+                    "media_message": None,
+                    "analysis_ready": False
                 }
+                
+                if media_msg:
+                    log(f"🎥 Found previous media message: {media_msg.id}")
+                    media_data = extract_media_data(media_msg, bot)
+                    if media_data:
+                        message_data["media_message"] = media_data
+                        message_data["analysis_ready"] = True
+                        
+                        # Create analysis bundle
+                        analysis_bundle = {
+                            "trigger": triggered_words[0],
+                            "video_url": media_data.get("video_url"),
+                            "username": media_data.get("username"),
+                            "media_type": media_data.get("item_type"),
+                            "timestamp": media_data.get("timestamp"),
+                            "caption": media_data.get("caption"),
+                            "duration": media_data.get("duration"),
+                            "frames": media_data.get("screenshots", [])
+                        }
+                        
+                        message_data["analysis_bundle"] = analysis_bundle
+                        log(f"📦 Analysis bundle created with {len(analysis_bundle.get('frames', []))} screenshots")
+                else:
+                    log("⚠️ No previous media message found")
 
-                # Our reply text
+                # Reply to the user
                 reply_text = f"👋 Thanks @{username}, I'll look into that!"
-
                 success = try_reply_with_backoff(thread_id, reply_text)
+                
                 if not success:
                     log("❌ All retries failed. Marking as seen and skipping.")
                     try:
@@ -126,9 +292,6 @@ def main():
                 replied_tracker[thread_id] = {"last_replied_msg_id": msg.id}
                 save_json(TRACKER_FILE, replied_tracker)
                 break  # only one reply per scan
-
-            else:
-                log(f"➡️ No trigger in msg {msg.id}")
 
     # Main loop
     while True:
