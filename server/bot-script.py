@@ -49,6 +49,7 @@ def save_json(filename, data):
 
 def extract_screenshots(video_url, output_dir, num_screenshots=5):
     """Extract 5 screenshots from video by downloading first, then processing"""
+    video_file = None
     try:
         os.makedirs(output_dir, exist_ok=True)
 
@@ -159,9 +160,6 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
             else:
                 log(f"❌ Failed to create screenshot {i} at {ts:.1f}s")
 
-        # Clean up downloaded video file
-        cleanup_video_file(video_file)
-
         log(f"✅ Successfully extracted {len(screenshots)} screenshots")
         return screenshots
 
@@ -170,6 +168,11 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
         import traceback
         log(f"📊 Traceback: {traceback.format_exc()}")
         return []
+    
+    finally:
+        # Always clean up the video file, even if an exception occurred
+        if video_file and os.path.exists(video_file):
+            cleanup_video_file(video_file)
 
 
 def find_previous_media_message(messages, trigger_msg_index):
