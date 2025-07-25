@@ -212,5 +212,40 @@
       "frames": []
     },
     "reply_sent": true
+  },
+  "32345939555777243843718374280396800": {
+    "trigger_message": {
+      "id": "32345939555777243843718374280396800",
+      "text": "whereclipped",
+      "user_id": "1578715925",
+      "username": "lord_hook",
+      "timestamp": "2025-07-25T20:54:56",
+      "triggered_words": [
+        "whereclipped"
+      ]
+    },
+    "media_message": {
+      "message_id": "32345939552600013537950788529160192",
+      "item_type": "clip",
+      "timestamp": "2025-07-25T20:54:56",
+      "user_id": "1578715925",
+      "video_url": "https://scontent-iad3-2.cdninstagram.com/o1/v/t2/f2/m86/AQOXoExH6Sj51bKYEkunwxv5CPKgFezT5sAk2X6pMgSIeis5s9tgE2XhiN4rveTT7FxSJU0SdeJwb3UmGboaLcZVENyBffRz9aklZsw.mp4?_nc_cat=106&_nc_sid=5e9851&_nc_ht=scontent-iad3-2.cdninstagram.com&_nc_ohc=VdNZfKIlecEQ7kNvwFKENfB&efg=eyJ2ZW5jb2RlX3RhZyI6Inhwdl9wcm9ncmVzc2l2ZS5JTlNUQUdSQU0uQ0xJUFMuQzMuNzIwLmRhc2hfYmFzZWxpbmVfMV92MSIsInhwdl9hc3NldF9pZCI6MTY4NDMzODM1MjQ3MDk5OSwidmlfdXNlY2FzZV9pZCI6MTAwOTksImR1cmF0aW9uX3MiOjQ1LCJ1cmxnZW5fc291cmNlIjoid3d3In0%3D&ccb=17-1&vs=690db1765489f6f1&_nc_vs=HBksFQIYUmlnX3hwdl9yZWVsc19wZXJtYW5lbnRfc3JfcHJvZC82MjQ4RThFOUI4MjQ5MEVFNzVENzQ1NTU0QjRFNURBRF92aWRlb19kYXNoaW5pdC5tcDQVAALIARIAFQIYOnBhc3N0aHJvdWdoX2V2ZXJzdG9yZS9HR21NU0IxODlqSG5MZDRJQUdPQXVtRXhaV2tfYnFfRUFBQUYVAgLIARIAKAAYABsCiAd1c2Vfb2lsATEScHJvZ3Jlc3NpdmVfcmVjaXBlATEVAAAmru_x0rL5_QUVAigCQzMsF0BG8zMzMzMzGBJkYXNoX2Jhc2VsaW5lXzFfdjERAHX-B2XmnQEA&_nc_zt=28&oh=00_AfTOcEyXK-R_ocO79gD6fbhjzXx4pNjtKnVwgCjOeNMqog&oe=6885D727",
+      "caption": "",
+      "media_type": 2,
+      "duration": null,
+      "screenshots": [],
+      "username": "lord_hook"
+    },
+    "analysis_ready": true,
+    "analysis_bundle": {
+      "trigger": "whereclipped",
+      "video_url": "https://scontent-iad3-2.cdninstagram.com/o1/v/t2/f2/m86/AQOXoExH6Sj51bKYEkunwxv5CPKgFezT5sAk2X6pMgSIeis5s9tgE2XhiN4rveTT7FxSJU0SdeJwb3UmGboaLcZVENyBffRz9aklZsw.mp4?_nc_cat=106&_nc_sid=5e9851&_nc_ht=scontent-iad3-2.cdninstagram.com&_nc_ohc=VdNZfKIlecEQ7kNvwFKENfB&efg=eyJ2ZW5jb2RlX3RhZyI6Inhwdl9wcm9ncmVzc2l2ZS5JTlNUQUdSQU0uQ0xJUFMuQzMuNzIwLmRhc2hfYmFzZWxpbmVfMV92MSIsInhwdl9hc3NldF9pZCI6MTY4NDMzODM1MjQ3MDk5OSwidmlfdXNlY2FzZV9pZCI6MTAwOTksImR1cmF0aW9uX3MiOjQ1LCJ1cmxnZW5fc291cmNlIjoid3d3In0%3D&ccb=17-1&vs=690db1765489f6f1&_nc_vs=HBksFQIYUmlnX3hwdl9yZWVsc19wZXJtYW5lbnRfc3JfcHJvZC82MjQ4RThFOUI4MjQ5MEVFNzVENzQ1NTU0QjRFNURBRF92aWRlb19kYXNoaW5pdC5tcDQVAALIARIAFQIYOnBhc3N0aHJvdWdoX2V2ZXJzdG9yZS9HR21NU0IxODlqSG5MZDRJQUdPQXVtRXhaV2tfYnFfRUFBQUYVAgLIARIAKAAYABsCiAd1c2Vfb2lsATEScHJvZ3Jlc3NpdmVfcmVjaXBlATEVAAAmru_x0rL5_QUVAigCQzMsF0BG8zMzMzMzGBJkYXNoX2Jhc2VsaW5lXzFfdjERAHX-B2XmnQEA&_nc_zt=28&oh=00_AfTOcEyXK-R_ocO79gD6fbhjzXx4pNjtKnVwgCjOeNMqog&oe=6885D727",
+      "username": "lord_hook",
+      "media_type": "clip",
+      "timestamp": "2025-07-25T20:54:56",
+      "caption": "",
+      "frames": []
+    },
+    "reply_sent": true
   }
 }
