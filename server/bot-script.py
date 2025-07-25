@@ -74,23 +74,42 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
         os.makedirs(output_dir, exist_ok=True)
 
         url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
-        log(f"📹 Extracting {num_screenshots} screenshots from video")
+        log(f"📹 Extracting {num_screenshots} screenshots from video: {url_str}")
 
         # Download video file first
         video_file = os.path.join(output_dir, "input_video.mp4")
         log("⬇️ Downloading video...")
 
         try:
-            response = requests.get(url_str, timeout=30)
+            # Add headers to mimic a browser request
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = requests.get(url_str, timeout=60, headers=headers, stream=True)
             response.raise_for_status()
 
             with open(video_file, "wb") as f:
-                f.write(response.content)
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
 
             file_size = os.path.getsize(video_file)
             log(f"✅ Download complete ({file_size} bytes)")
+            
+            if file_size == 0:
+                log("❌ Downloaded file is empty")
+                return []
+                
         except Exception as e:
             log(f"❌ Failed to download video: {e}")
+            return []
+
+        # Check if ffmpeg and ffprobe are available
+        try:
+            subprocess.run(["ffprobe", "-version"], capture_output=True, check=True)
+            subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
+            log("✅ FFmpeg tools are available")
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            log(f"❌ FFmpeg tools not available: {e}")
             return []
 
         # Get video duration using ffprobe
@@ -102,25 +121,34 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    timeout=15
+                    timeout=30
                 )
+                log(f"📊 ffprobe result: returncode={result.returncode}, stdout='{result.stdout}', stderr='{result.stderr}'")
                 if result.returncode == 0 and result.stdout.strip():
-                    return float(result.stdout.strip())
+                    duration = float(result.stdout.strip())
+                    log(f"⏱️ Parsed duration: {duration}")
+                    return duration
                 return None
             except Exception as e:
                 log(f"❌ Error getting duration: {e}")
                 return None
 
         duration = get_duration(video_file)
-        if duration is None:
-            log("❌ Could not get video duration, using fixed timestamps")
-            # Fallback to fixed timestamps
-            timestamps = [2, 5, 8, 11, 14]
+        if duration is None or duration <= 0:
+            log("⚠️ Could not get valid duration, using fixed timestamps")
+            # Fallback to fixed timestamps (assuming reasonable video length)
+            timestamps = [1, 3, 5, 7, 9]
         else:
             log(f"⏱️ Duration: {duration:.2f} seconds")
-            # Calculate evenly spaced timestamps
-            interval = duration / (num_screenshots + 1)
-            timestamps = [interval * (i + 1) for i in range(num_screenshots)]
+            # Calculate evenly spaced timestamps, ensuring we don't go past the end
+            if duration < num_screenshots:
+                # If video is very short, use smaller intervals
+                timestamps = [i * 0.5 for i in range(1, num_screenshots + 1) if i * 0.5 < duration]
+            else:
+                interval = duration / (num_screenshots + 1)
+                timestamps = [interval * (i + 1) for i in range(num_screenshots)]
+
+        log(f"📍 Using timestamps: {timestamps}")
 
         # Take screenshots
         screenshots = []
@@ -132,30 +160,40 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
             cmd = [
                 "ffmpeg", "-ss", str(ts), "-i", video_file,
                 "-vframes", "1", "-q:v", "2", output_path,
-                "-y", "-hide_banner", "-loglevel", "error"
+                "-y", "-hide_banner", "-loglevel", "warning"
             ]
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            log(f"🔧 Running: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+
+            log(f"📊 ffmpeg result for screenshot {i}: returncode={result.returncode}")
+            if result.stderr:
+                log(f"📊 ffmpeg stderr: {result.stderr}")
 
             if result.returncode == 0 and os.path.exists(output_path):
                 file_size = os.path.getsize(output_path)
-                screenshots.append(output_path)
-                log(f"🖼️ Saved screenshot_{i}.jpg at {int(ts)}s ({file_size} bytes)")
+                if file_size > 0:
+                    screenshots.append(output_path)
+                    log(f"🖼️ Saved screenshot_{i}.jpg at {ts:.1f}s ({file_size} bytes)")
+                else:
+                    log(f"❌ Screenshot {i} file is empty")
             else:
-                log(f"❌ Failed to create screenshot {i} at {int(ts)}s")
+                log(f"❌ Failed to create screenshot {i} at {ts:.1f}s")
 
         # Clean up downloaded video
         try:
             os.remove(video_file)
             log("🗑️ Cleaned up downloaded video file")
-        except:
-            pass
+        except Exception as e:
+            log(f"⚠️ Could not clean up video file: {e}")
 
         log(f"✅ Successfully extracted {len(screenshots)} screenshots")
         return screenshots
 
     except Exception as e:
         log(f"❌ Error extracting screenshots: {e}")
+        import traceback
+        log(f"📊 Traceback: {traceback.format_exc()}")
         return []
 
 
