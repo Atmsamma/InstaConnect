@@ -15,37 +15,16 @@ def log(*args):
     print(*args, file=sys.stderr, flush=True)
 
 
-def cleanup_screenshots(screenshot_paths):
-    """Clean up screenshot files and directories to save storage space"""
-    if not screenshot_paths:
-        return
-        
-    log("🗑️ Cleaning up screenshot files...")
-    
-    directories_to_check = set()
-    
-    for screenshot_path in screenshot_paths:
-        try:
-            if os.path.exists(screenshot_path):
-                os.remove(screenshot_path)
-                log(f"🗑️ Deleted {screenshot_path}")
-                
-                # Add parent directory to check for cleanup
-                parent_dir = os.path.dirname(screenshot_path)
-                directories_to_check.add(parent_dir)
-        except Exception as e:
-            log(f"⚠️ Could not delete {screenshot_path}: {e}")
-    
-    # Remove empty directories
-    for directory in directories_to_check:
-        try:
-            if os.path.exists(directory) and not os.listdir(directory):
-                os.rmdir(directory)
-                log(f"🗑️ Removed empty directory {directory}")
-        except Exception as e:
-            log(f"⚠️ Could not remove directory {directory}: {e}")
-    
-    log("✅ Screenshot cleanup complete")
+def cleanup_video_file(video_file_path):
+    """Clean up only the downloaded video file to save storage space"""
+    try:
+        if os.path.exists(video_file_path):
+            os.remove(video_file_path)
+            log(f"🗑️ Cleaned up video file: {video_file_path}")
+        else:
+            log(f"⚠️ Video file not found for cleanup: {video_file_path}")
+    except Exception as e:
+        log(f"⚠️ Could not clean up video file {video_file_path}: {e}")
 
 
 def load_json(filename):
@@ -180,12 +159,8 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
             else:
                 log(f"❌ Failed to create screenshot {i} at {ts:.1f}s")
 
-        # Clean up downloaded video
-        try:
-            os.remove(video_file)
-            log("🗑️ Cleaned up downloaded video file")
-        except Exception as e:
-            log(f"⚠️ Could not clean up video file: {e}")
+        # Clean up downloaded video file
+        cleanup_video_file(video_file)
 
         log(f"✅ Successfully extracted {len(screenshots)} screenshots")
         return screenshots
@@ -379,8 +354,7 @@ def main():
                         message_data["analysis_bundle"] = analysis_bundle
                         log(f"📦 Analysis bundle created with {len(analysis_bundle.get('frames', []))} screenshots")
                         
-                        # Clean up screenshot files after creating the analysis bundle
-                        cleanup_screenshots(media_data.get("screenshots", []))
+                        # Screenshots are kept for later use - only video files are cleaned up
                 else:
                     log("⚠️ No previous media message found")
 
