@@ -1,4 +1,3 @@
-
 import time
 import json
 import sys
@@ -7,8 +6,10 @@ from instagrapi import Client
 from instagrapi.exceptions import UnknownError
 import pathlib
 
+
 def log(*args):
     print(*args, file=sys.stderr, flush=True)
+
 
 def load_json(filename):
     try:
@@ -17,13 +18,16 @@ def load_json(filename):
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
+
 def save_json(filename, data):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+
 # Triggers for the bot to respond to
 TRIGGERS = ["whereclipped", "cliplive"]
+
 
 def main():
     # Find the session file
@@ -31,10 +35,10 @@ def main():
     if not session_files:
         log("❌ No session file found. Please log in first.")
         return
-    
+
     session_file = session_files[0]
     log(f"📁 Using session file: {session_file}")
-    
+
     bot = Client()
     bot.load_settings(str(session_file))
 
@@ -75,12 +79,13 @@ def main():
                 return True
             except UnknownError as e:
                 log(f"⚠️ UnknownError, retry {i+1}/{retries}: {e}")
-                time.sleep(2 ** i)
+                time.sleep(2**i)
         return False
 
     def handle_new_dm(thread):
         thread_id = thread.id
-        last_seen = replied_tracker.get(thread_id, {}).get("last_replied_msg_id")
+        last_seen = replied_tracker.get(thread_id,
+                                        {}).get("last_replied_msg_id")
 
         for msg in thread.messages:
             if msg.id == last_seen:
@@ -91,48 +96,11 @@ def main():
                 username = safe_username(msg.user_id)
                 log(f"💬 Trigger in {thread_id} from @{username}")
 
-                # Store complete Instagram message data
-                try:
-                    # Convert message object to dict to capture all data
-                    raw_message_data = {}
-                    for attr in dir(msg):
-                        if not attr.startswith('_'):
-                            try:
-                                value = getattr(msg, attr)
-                                # Handle different data types
-                                if hasattr(value, 'isoformat'):  # datetime objects
-                                    raw_message_data[attr] = value.isoformat()
-                                elif hasattr(value, '__dict__'):  # complex objects
-                                    try:
-                                        # Try to convert to dict
-                                        if hasattr(value, 'dict'):
-                                            raw_message_data[attr] = value.dict()
-                                        else:
-                                            raw_message_data[attr] = str(value)
-                                    except:
-                                        raw_message_data[attr] = str(value)
-                                elif callable(value):
-                                    continue  # skip methods
-                                else:
-                                    raw_message_data[attr] = value
-                            except Exception as e:
-                                raw_message_data[attr] = f"Error accessing: {str(e)}"
-                except Exception as e:
-                    raw_message_data = {"error": f"Failed to extract message data: {str(e)}"}
-
+                # Store detailed message data
                 message_data = {
-                    "message_id": msg.id,
-                    "thread_id": thread_id,
-                    "user_id": msg.user_id,
-                    "username": username,
-                    "text": msg.text or "",
-                    "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
-                    "has_media_share": bool(msg.media_share),
-                    "media_share_url": msg.media_share.code if msg.media_share else None,
-                    "triggered_words": [t for t in TRIGGERS if t in text.lower()],
-                    "reply_sent": False,
-                    "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "raw_instagram_data": raw_message_data  # Full Instagram message data
+                    "raw_message": json.loads(
+                        json.dumps(vars(msg),
+                                   default=str))  # make it JSON serializable
                 }
 
                 # Our reply text
@@ -175,6 +143,7 @@ def main():
         except Exception as e:
             log("❌ Error in main loop:", e)
             time.sleep(30)
+
 
 if __name__ == "__main__":
     main()

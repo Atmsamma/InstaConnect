@@ -1,0 +1,130 @@
+Objective:
+Given a DM thread, detect when a user sends a trigger text message (e.g. "whereclipped"), find the related media post, and extract:
+
+the video URL
+
+metadata
+
+5 screenshots from the video using ffmpeg
+
+all this packaged for AI analysis
+
+🧠 AI Task Breakdown with Tools
+📩 Detect Trigger Message
+
+Tool: Your Python script using instagrapi
+
+Check:
+
+Loop through thread.messages
+
+Find the latest item_type == "text"
+
+Match message content to keywords (e.g. "whereclipped")
+
+🔙 Get Previous Media Message
+
+Tool: Your script logic
+
+Logic:
+
+Find the media_share or clip message immediately before the trigger message
+
+Valid item_type values include:
+
+"media_share"
+
+"clip"
+
+"xma_media_share" (sometimes used for Instagram Reels or posts)
+
+📦 Extract Metadata from Message
+
+Tool: Python (instagrapi.Client)
+
+From the media message, extract:
+
+.media or .clip or .media_share
+
+Fields like:
+
+video_url (often media.video_url)
+
+caption
+
+user_id / username
+
+taken_at / timestamp
+
+media_type
+
+💾 Download Video
+
+Tool: requests or urllib.request
+
+Python Example:
+
+python
+Copy
+Edit
+import requests
+r = requests.get(video_url)
+with open("temp_video.mp4", "wb") as f:
+    f.write(r.content)
+⏱️ Get Video Duration
+
+Tool: ffprobe
+
+Command:
+
+bash
+Copy
+Edit
+ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 temp_video.mp4
+Purpose: Get total length in seconds to calculate frame timestamps
+
+📸 Take 5 Screenshots
+
+Tool: ffmpeg
+
+Logic:
+
+Divide duration into 6 segments → get 5 equally spaced points
+
+Run 5 commands:
+
+bash
+Copy
+Edit
+ffmpeg -ss {timestamp} -i temp_video.mp4 -vframes 1 clip_1.jpg
+🧾 Bundle Results for AI Analysis
+
+Tool: Python json output
+
+Structure:
+
+json
+Copy
+Edit
+{
+  "trigger": "whereclipped",
+  "video_url": "https://...",
+  "username": "lord_hook",
+  "media_type": "media_share",
+  "timestamp": "2025-07-25T15:38:48",
+  "caption": "Look at this!",
+  "duration": 14.6,
+  "frames": [
+    "clip_1.jpg",
+    "clip_2.jpg",
+    "clip_3.jpg",
+    "clip_4.jpg",
+    "clip_5.jpg"
+  ]
+}
+⚙️ Optional: Add AI Enrichment Step
+Once you have the metadata + 5 thumbnails, you can feed that into a local vision model like LLaVA, GPT-4V, or Gemini, or use an API like Replicate, OpenAI, or HuggingFace.
+
+Prompt Example to Vision Model:
+
+"Here are 5 thumbnails from a shared Instagram video. The caption was 'Look at this!'. Please describe what kind of content this video likely contains and what platform or event it's from."
