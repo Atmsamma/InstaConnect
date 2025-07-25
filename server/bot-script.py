@@ -41,17 +41,23 @@ def get_video_duration(video_url):
     try:
         # Convert HttpUrl object to string if needed
         url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
+        log(f"🔍 Trying to get duration for: {url_str[:100]}...")
         
         cmd = [
             "ffprobe", "-v", "error", "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1", url_str
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode == 0:
-            return float(result.stdout.strip())
+            duration = float(result.stdout.strip())
+            log(f"✅ Video duration: {duration} seconds")
+            return duration
         else:
-            log(f"❌ ffprobe error: {result.stderr}")
+            log(f"❌ ffprobe error (code {result.returncode}): {result.stderr.strip()}")
             return None
+    except subprocess.TimeoutExpired:
+        log("❌ ffprobe timeout - video URL may be inaccessible")
+        return None
     except Exception as e:
         log(f"❌ Error getting video duration: {e}")
         return None
@@ -68,8 +74,10 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
         # Get video duration
         duration = get_video_duration(url_str)
         if not duration:
+            log("⚠️ Skipping screenshot extraction - no duration available")
             return []
         
+        log(f"📹 Extracting {num_screenshots} screenshots from {duration}s video")
         screenshots = []
         # Divide duration into segments and take screenshots at equal intervals
         interval = duration / (num_screenshots + 1)
@@ -80,17 +88,21 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
             
             cmd = [
                 "ffmpeg", "-y", "-ss", str(timestamp), "-i", url_str,
-                "-vframes", "1", "-q:v", "2", output_path
+                "-vframes", "1", "-q:v", "2", output_path, "-hide_banner", "-loglevel", "error"
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode == 0:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode == 0 and os.path.exists(output_path):
                 screenshots.append(output_path)
                 log(f"📸 Screenshot {i} saved: {output_path}")
             else:
-                log(f"❌ ffmpeg error for screenshot {i}: {result.stderr}")
+                log(f"❌ ffmpeg error for screenshot {i} (code {result.returncode}): {result.stderr.strip()}")
         
+        log(f"✅ Successfully extracted {len(screenshots)} screenshots")
         return screenshots
+    except subprocess.TimeoutExpired:
+        log("❌ ffmpeg timeout during screenshot extraction")
+        return []
     except Exception as e:
         log(f"❌ Error extracting screenshots: {e}")
         return []
