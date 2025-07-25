@@ -1,0 +1,17 @@
+{
+  "32345498293627009223759043089137664": {
+    "message_id": "32345498293627009223759043089137664",
+    "thread_id": "340282366841710301244259966640699321635",
+    "user_id": "1578715925",
+    "username": "lord_hook",
+    "text": "whereclipped",
+    "timestamp": "2025-07-25T14:16:16",
+    "has_media_share": false,
+    "media_share_url": null,
+    "triggered_words": [
+      "whereclipped"
+    ],
+    "reply_sent": true,
+    "created_at": "2025-07-25 14:16:29"
+  }
+}
