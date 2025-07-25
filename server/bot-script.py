@@ -1,4 +1,3 @@
-
 import time
 import json
 import sys
@@ -37,26 +36,38 @@ def save_json(filename, data):
 
 
 def get_video_duration(video_url):
-    """Get video duration using ffprobe"""
+    """Get video duration using ffmpeg"""
     try:
         # Convert HttpUrl object to string if needed
         url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
-        log(f"🔍 Trying to get duration for: {url_str[:100]}...")
-        
+        log(f"🔍 Getting duration for: {url_str[:100]}...")
+
+        # Use ffmpeg to get video info
         cmd = [
-            "ffprobe", "-v", "error", "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1", url_str
+            "ffmpeg", "-i", url_str, "-f", "null", "-", "-hide_banner", "-v", "quiet", "-stats"
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode == 0:
-            duration = float(result.stdout.strip())
-            log(f"✅ Video duration: {duration} seconds")
-            return duration
-        else:
-            log(f"❌ ffprobe error (code {result.returncode}): {result.stderr.strip()}")
-            return None
+
+        # Parse ffmpeg output for duration (appears in stderr)
+        output = result.stderr
+        for line in output.split('\n'):
+            if 'Duration:' in line:
+                duration_str = line.split('Duration: ')[1].split(',')[0].strip()
+                # Convert HH:MM:SS.ms to seconds
+                time_parts = duration_str.split(':')
+                if len(time_parts) == 3:
+                    hours = float(time_parts[0])
+                    minutes = float(time_parts[1])
+                    seconds = float(time_parts[2])
+                    total_seconds = hours * 3600 + minutes * 60 + seconds
+                    log(f"✅ Video duration: {total_seconds} seconds")
+                    return total_seconds
+
+        log(f"❌ Could not extract duration from ffmpeg output")
+        return None
+
     except subprocess.TimeoutExpired:
-        log("❌ ffprobe timeout - video URL may be inaccessible")
+        log("❌ ffmpeg timeout - video URL may be inaccessible")
         return None
     except Exception as e:
         log(f"❌ Error getting video duration: {e}")
@@ -67,37 +78,37 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
     """Extract screenshots from video using ffmpeg"""
     try:
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Convert HttpUrl object to string if needed
         url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
-        
+
         # Get video duration
         duration = get_video_duration(url_str)
         if not duration:
             log("⚠️ Skipping screenshot extraction - no duration available")
             return []
-        
+
         log(f"📹 Extracting {num_screenshots} screenshots from {duration}s video")
         screenshots = []
         # Divide duration into segments and take screenshots at equal intervals
         interval = duration / (num_screenshots + 1)
-        
+
         for i in range(1, num_screenshots + 1):
             timestamp = interval * i
             output_path = os.path.join(output_dir, f"clip_{i}.jpg")
-            
+
             cmd = [
                 "ffmpeg", "-y", "-ss", str(timestamp), "-i", url_str,
                 "-vframes", "1", "-q:v", "2", output_path, "-hide_banner", "-loglevel", "error"
             ]
-            
+
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if result.returncode == 0 and os.path.exists(output_path):
                 screenshots.append(output_path)
                 log(f"📸 Screenshot {i} saved: {output_path}")
             else:
                 log(f"❌ ffmpeg error for screenshot {i} (code {result.returncode}): {result.stderr.strip()}")
-        
+
         log(f"✅ Successfully extracted {len(screenshots)} screenshots")
         return screenshots
     except subprocess.TimeoutExpired:
@@ -113,12 +124,12 @@ def find_previous_media_message(messages, trigger_msg_index):
     # Look backwards from the trigger message
     for i in range(trigger_msg_index + 1, len(messages)):
         msg = messages[i]
-        
+
         # Check for various media types
         if (msg.media_share or msg.clip or 
             (hasattr(msg, 'item_type') and msg.item_type in ['media_share', 'clip', 'xma_media_share'])):
             return msg
-    
+
     return None
 
 
@@ -136,21 +147,21 @@ def extract_media_data(media_msg, bot):
             "duration": None,
             "screenshots": []
         }
-        
+
         # Get username
         try:
             user_info = bot.user_info(media_msg.user_id)
             media_data["username"] = user_info.username
         except:
             media_data["username"] = f"user_{media_msg.user_id}"
-        
+
         # Extract media info based on type
         media_obj = None
         if media_msg.media_share:
             media_obj = media_msg.media_share
         elif media_msg.clip:
             media_obj = media_msg.clip
-        
+
         if media_obj:
             # Extract video URL and convert to string
             video_url = None
@@ -158,26 +169,26 @@ def extract_media_data(media_msg, bot):
                 video_url = str(media_obj.video_url)
             elif hasattr(media_obj, 'video_versions') and media_obj.video_versions:
                 video_url = str(media_obj.video_versions[0].url)
-            
+
             media_data["video_url"] = video_url
-            
+
             # Extract other metadata
             media_data["caption"] = getattr(media_obj, 'caption', {}).get('text', '') if hasattr(media_obj, 'caption') else ''
             media_data["media_type"] = getattr(media_obj, 'media_type', None)
-            
+
             # If we have a video URL, process it
             if video_url:
                 # Get duration
                 duration = get_video_duration(video_url)
                 media_data["duration"] = duration
-                
+
                 # Extract screenshots
                 output_dir = os.path.join("output", "screenshots", media_msg.id)
                 screenshots = extract_screenshots(video_url, output_dir)
                 media_data["screenshots"] = screenshots
-        
+
         return media_data
-        
+
     except Exception as e:
         log(f"❌ Error extracting media data: {e}")
         return None
@@ -249,17 +260,17 @@ def main():
                 break  # we've already processed up to here
 
             text = (msg.text or "").lower()
-            
+
             # Check if this is a trigger message
             triggered_words = [t for t in TRIGGERS if t in text]
-            
+
             if triggered_words:
                 username = safe_username(msg.user_id)
                 log(f"💬 Trigger '{triggered_words[0]}' in {thread_id} from @{username}")
 
                 # Find the previous media message
                 media_msg = find_previous_media_message(thread.messages, i)
-                
+
                 message_data = {
                     "trigger_message": {
                         "id": msg.id,
@@ -272,14 +283,14 @@ def main():
                     "media_message": None,
                     "analysis_ready": False
                 }
-                
+
                 if media_msg:
                     log(f"🎥 Found previous media message: {media_msg.id}")
                     media_data = extract_media_data(media_msg, bot)
                     if media_data:
                         message_data["media_message"] = media_data
                         message_data["analysis_ready"] = True
-                        
+
                         # Create analysis bundle
                         analysis_bundle = {
                             "trigger": triggered_words[0],
@@ -291,7 +302,7 @@ def main():
                             "duration": media_data.get("duration"),
                             "frames": media_data.get("screenshots", [])
                         }
-                        
+
                         message_data["analysis_bundle"] = analysis_bundle
                         log(f"📦 Analysis bundle created with {len(analysis_bundle.get('frames', []))} screenshots")
                 else:
@@ -300,7 +311,7 @@ def main():
                 # Reply to the user
                 reply_text = f"👋 Thanks @{username}, I'll look into that!"
                 success = try_reply_with_backoff(thread_id, reply_text)
-                
+
                 if not success:
                     log("❌ All retries failed. Marking as seen and skipping.")
                     try:
