@@ -91,7 +91,35 @@ def main():
                 username = safe_username(msg.user_id)
                 log(f"💬 Trigger in {thread_id} from @{username}")
 
-                # Store detailed message data
+                # Store complete Instagram message data
+                try:
+                    # Convert message object to dict to capture all data
+                    raw_message_data = {}
+                    for attr in dir(msg):
+                        if not attr.startswith('_'):
+                            try:
+                                value = getattr(msg, attr)
+                                # Handle different data types
+                                if hasattr(value, 'isoformat'):  # datetime objects
+                                    raw_message_data[attr] = value.isoformat()
+                                elif hasattr(value, '__dict__'):  # complex objects
+                                    try:
+                                        # Try to convert to dict
+                                        if hasattr(value, 'dict'):
+                                            raw_message_data[attr] = value.dict()
+                                        else:
+                                            raw_message_data[attr] = str(value)
+                                    except:
+                                        raw_message_data[attr] = str(value)
+                                elif callable(value):
+                                    continue  # skip methods
+                                else:
+                                    raw_message_data[attr] = value
+                            except Exception as e:
+                                raw_message_data[attr] = f"Error accessing: {str(e)}"
+                except Exception as e:
+                    raw_message_data = {"error": f"Failed to extract message data: {str(e)}"}
+
                 message_data = {
                     "message_id": msg.id,
                     "thread_id": thread_id,
@@ -103,7 +131,8 @@ def main():
                     "media_share_url": msg.media_share.code if msg.media_share else None,
                     "triggered_words": [t for t in TRIGGERS if t in text.lower()],
                     "reply_sent": False,
-                    "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
+                    "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "raw_instagram_data": raw_message_data  # Full Instagram message data
                 }
 
                 # Our reply text
