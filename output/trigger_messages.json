@@ -1,53 +1,38 @@
 {
-  "32345498293627009223759043089137664": {
-    "message_id": "32345498293627009223759043089137664",
-    "thread_id": "340282366841710301244259966640699321635",
-    "user_id": "1578715925",
-    "username": "lord_hook",
-    "text": "whereclipped",
-    "timestamp": "2025-07-25T14:16:16",
-    "has_media_share": false,
-    "media_share_url": null,
-    "triggered_words": [
-      "whereclipped"
-    ],
-    "reply_sent": true,
-    "created_at": "2025-07-25 14:16:29"
-  },
-  "32345523253826542823026221763264512": {
-    "message_id": "32345523253826542823026221763264512",
-    "thread_id": "340282366841710301244259966640699321635",
-    "user_id": "1578715925",
-    "username": "lord_hook",
-    "text": "whereclipped",
-    "timestamp": "2025-07-25T14:38:49",
-    "has_media_share": false,
-    "media_share_url": null,
-    "triggered_words": [
-      "whereclipped"
-    ],
-    "reply_sent": true,
-    "created_at": "2025-07-25 14:39:14"
-  },
-  "32345553134432985191261102405582848": {
-    "message_id": "32345553134432985191261102405582848",
-    "thread_id": "340282366841710301244259966640699321635",
-    "user_id": "1578715925",
-    "username": "lord_hook",
-    "text": "whereclipped",
-    "timestamp": "2025-07-25T15:05:48",
-    "has_media_share": false,
-    "media_share_url": null,
-    "triggered_words": [
-      "whereclipped"
-    ],
-    "reply_sent": true,
-    "created_at": "2025-07-25 15:06:03"
-  },
-  "32345775794902172941011276460457984": {
+  "32345782064986067364206056463925248": {
     "trigger_message": {
-      "id": "32345775794902172941011276460457984",
+      "id": "32345782064986067364206056463925248",
       "text": "whereclipped",
       "user_id": "1578715925",
       "username": "lord_hook",
-      "timestamp": 
+      "timestamp": "2025-07-25T18:32:39",
+      "triggered_words": [
+        "whereclipped"
+      ]
+    },
+    "media_message": {
+      "message_id": "32345782062067810898489279107825664",
+      "item_type": "clip",
+      "timestamp": "2025-07-25T18:32:39",
+      "user_id": "1578715925",
+      "video_url": "https://scontent-iad3-1.cdninstagram.com/o1/v/t2/f2/m86/AQMNeGXcux3EQg_4pEnikYlvTYlwNXiOm_a-wMmnAvBa8d-onAjW6imt78xZQTksQOqTdzQ5-dgihysA0QzEcN4egXKCsG-FOVHqgtE.mp4?_nc_cat=110&_nc_sid=5e9851&_nc_ht=scontent-iad3-1.cdninstagram.com&_nc_ohc=Wb-seTES53IQ7kNvwFGwxf1&efg=eyJ2ZW5jb2RlX3RhZyI6Inhwdl9wcm9ncmVzc2l2ZS5JTlNUQUdSQU0uQ0xJUFMuQzMuNzIwLmRhc2hfYmFzZWxpbmVfMV92MSIsInhwdl9hc3NldF9pZCI6NzU1NDQ4NDUzNjM3OTY5LCJ2aV91c2VjYXNlX2lkIjoxMDA5OSwiZHVyYXRpb25fcyI6MjMsInVybGdlbl9zb3VyY2UiOiJ3d3cifQ%3D%3D&ccb=17-1&vs=a4a623ebea66f77c&_nc_vs=HBksFQIYUmlnX3hwdl9yZWVsc19wZXJtYW5lbnRfc3JfcHJvZC83OTQ0MDEzMjkxMzRDNDc2MUJBMjM5QTNGOEVBMTdCQV92aWRlb19kYXNoaW5pdC5tcDQVAALIARIAFQIYOnBhc3N0aHJvdWdoX2V2ZXJzdG9yZS9HQ0Y2SVI5RGk3a0ZfeUVGQUkxS0RveVFTOVVCYnFfRUFBQUYVAgLIARIAKAAYABsCiAd1c2Vfb2lsATEScHJvZ3Jlc3NpdmVfcmVjaXBlATEVAAAmop3Ny_HE1wIVAigCQzMsF0A3Kn752yLRGBJkYXNoX2Jhc2VsaW5lXzFfdjERAHX-B2XmnQEA&_nc_zt=28&oh=00_AfSGjkQuIb1r7zS6qvrZB0b2kIebjDDZkGPA-7vThzQ4Lg&oe=6885B9F3",
+      "caption": "",
+      "media_type": 2,
+      "duration": null,
+      "screenshots": [],
+      "username": "lord_hook"
+    },
+    "analysis_ready": true,
+    "analysis_bundle": {
+      "trigger": "whereclipped",
+      "video_url": "https://scontent-iad3-1.cdninstagram.com/o1/v/t2/f2/m86/AQMNeGXcux3EQg_4pEnikYlvTYlwNXiOm_a-wMmnAvBa8d-onAjW6imt78xZQTksQOqTdzQ5-dgihysA0QzEcN4egXKCsG-FOVHqgtE.mp4?_nc_cat=110&_nc_sid=5e9851&_nc_ht=scontent-iad3-1.cdninstagram.com&_nc_ohc=Wb-seTES53IQ7kNvwFGwxf1&efg=eyJ2ZW5jb2RlX3RhZyI6Inhwdl9wcm9ncmVzc2l2ZS5JTlNUQUdSQU0uQ0xJUFMuQzMuNzIwLmRhc2hfYmFzZWxpbmVfMV92MSIsInhwdl9hc3NldF9pZCI6NzU1NDQ4NDUzNjM3OTY5LCJ2aV91c2VjYXNlX2lkIjoxMDA5OSwiZHVyYXRpb25fcyI6MjMsInVybGdlbl9zb3VyY2UiOiJ3d3cifQ%3D%3D&ccb=17-1&vs=a4a623ebea66f77c&_nc_vs=HBksFQIYUmlnX3hwdl9yZWVsc19wZXJtYW5lbnRfc3JfcHJvZC83OTQ0MDEzMjkxMzRDNDc2MUJBMjM5QTNGOEVBMTdCQV92aWRlb19kYXNoaW5pdC5tcDQVAALIARIAFQIYOnBhc3N0aHJvdWdoX2V2ZXJzdG9yZS9HQ0Y2SVI5RGk3a0ZfeUVGQUkxS0RveVFTOVVCYnFfRUFBQUYVAgLIARIAKAAYABsCiAd1c2Vfb2lsATEScHJvZ3Jlc3NpdmVfcmVjaXBlATEVAAAmop3Ny_HE1wIVAigCQzMsF0A3Kn752yLRGBJkYXNoX2Jhc2VsaW5lXzFfdjERAHX-B2XmnQEA&_nc_zt=28&oh=00_AfSGjkQuIb1r7zS6qvrZB0b2kIebjDDZkGPA-7vThzQ4Lg&oe=6885B9F3",
+      "username": "lord_hook",
+      "media_type": "clip",
+      "timestamp": "2025-07-25T18:32:39",
+      "caption": "",
+      "duration": null,
+      "frames": []
+    },
+    "reply_sent": true
+  }
+}
