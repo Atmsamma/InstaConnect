@@ -39,6 +39,7 @@ def main():
     bot.load_settings(str(session_file))
 
     TRACKER_FILE = "output/replied_messages_tracker.json"
+    TRIGGER_MESSAGES_FILE = "output/trigger_messages.json"
 
     # Safe load of our JSON tracker
     try:
@@ -47,6 +48,9 @@ def main():
     except (FileNotFoundError, json.JSONDecodeError):
         replied_tracker = {}
         save_json(TRACKER_FILE, replied_tracker)
+
+    # Load trigger messages data
+    trigger_messages = load_json(TRIGGER_MESSAGES_FILE)
 
     log("🚀 Bot is running... (Ctrl+C to stop)")
 
@@ -87,6 +91,21 @@ def main():
                 username = safe_username(msg.user_id)
                 log(f"💬 Trigger in {thread_id} from @{username}")
 
+                # Store detailed message data
+                message_data = {
+                    "message_id": msg.id,
+                    "thread_id": thread_id,
+                    "user_id": msg.user_id,
+                    "username": username,
+                    "text": msg.text or "",
+                    "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+                    "has_media_share": bool(msg.media_share),
+                    "media_share_url": msg.media_share.code if msg.media_share else None,
+                    "triggered_words": [t for t in TRIGGERS if t in text.lower()],
+                    "reply_sent": False,
+                    "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
+                }
+
                 # Our reply text
                 reply_text = f"👋 Thanks @{username}, I'll look into that!"
 
@@ -97,6 +116,14 @@ def main():
                         bot.direct_send_seen(msg.id)
                     except Exception as e:
                         log("⚠️ Couldn't mark as seen:", e)
+                else:
+                    message_data["reply_sent"] = True
+
+                # Store the trigger message data
+                if msg.id not in trigger_messages:
+                    trigger_messages[msg.id] = message_data
+                    save_json(TRIGGER_MESSAGES_FILE, trigger_messages)
+                    log(f"📝 Stored trigger message data for {msg.id}")
 
                 # Always update tracker so we don't loop on this msg again
                 replied_tracker[thread_id] = {"last_replied_msg_id": msg.id}

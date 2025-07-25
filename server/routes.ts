@@ -80,6 +80,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/bot/trigger-messages", async (req, res) => {
+    try {
+      const fs = await import("fs/promises");
+      const path = await import("path");
+      
+      const triggerMessagesPath = path.join(process.cwd(), "output", "trigger_messages.json");
+      
+      try {
+        const data = await fs.readFile(triggerMessagesPath, "utf-8");
+        const triggerMessages = JSON.parse(data);
+        
+        // Convert to array and sort by timestamp
+        const messagesArray = Object.values(triggerMessages).sort((a: any, b: any) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        
+        res.json({
+          success: true,
+          messages: messagesArray,
+          count: messagesArray.length
+        });
+      } catch (fileError) {
+        // File doesn't exist yet
+        res.json({
+          success: true,
+          messages: [],
+          count: 0
+        });
+      }
+    } catch (error: any) {
+      console.error("Trigger messages error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get trigger messages"
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, Title } from "@/components/ui/card";
@@ -20,6 +19,8 @@ export default function Dashboard() {
     logs: [],
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [triggerMessages, setTriggerMessages] = useState<any[]>([]);
+  const [loadingTriggerMessages, setLoadingTriggerMessages] = useState(false);
   const { toast } = useToast();
 
   const startBot = async () => {
@@ -29,9 +30,9 @@ export default function Dashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
         setBotStatus(prev => ({ 
           ...prev, 
@@ -65,9 +66,9 @@ export default function Dashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
         setBotStatus(prev => ({ 
           ...prev, 
@@ -95,7 +96,7 @@ export default function Dashboard() {
     try {
       const response = await fetch("/api/bot/logs");
       const result = await response.json();
-      
+
       if (result.success) {
         setBotStatus(prev => ({
           ...prev,
