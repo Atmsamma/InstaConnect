@@ -35,110 +35,20 @@ def save_json(filename, data):
         json.dump(data, f, ensure_ascii=False, indent=2, default=json_serial)
 
 
-def get_video_duration(video_url):
-    """Get video duration from Instagram URL or using ffmpeg"""
-    try:
-        # Convert HttpUrl object to string if needed
-        url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
-        log(f"🔍 Getting duration for: {url_str[:100]}...")
-
-        # First try to extract duration from Instagram URL parameters
-        import urllib.parse
-        import base64
-        import json as json_lib
-
-        if 'instagram.com' in url_str and 'efg=' in url_str:
-            try:
-                # Extract the 'efg' parameter which contains encoded video metadata
-                parsed = urllib.parse.urlparse(url_str)
-                params = urllib.parse.parse_qs(parsed.query)
-
-                if 'efg' in params:
-                    efg_encoded = params['efg'][0]
-                    # URL decode
-                    efg_decoded = urllib.parse.unquote(efg_encoded)
-                    log(f"🔍 Decoded efg: {efg_decoded}")
-
-                    # Parse as JSON directly (it's not base64 encoded)
-                    efg_data = json_lib.loads(efg_decoded)
-
-                    if 'duration_s' in efg_data:
-                        duration = float(efg_data['duration_s'])
-                        log(f"✅ Video duration (from URL): {duration} seconds")
-                        return duration
-            except Exception as e:
-                log(f"⚠️ Could not extract duration from URL metadata: {e}")
-
-        # If Instagram URL parsing failed, try simple ffmpeg probe
-        log("🔍 Trying ffmpeg probe...")
-        cmd = [
-            "ffmpeg", "-i", url_str, "-t", "0.1", "-f", "null", "-", 
-            "-hide_banner"
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-
-        # Parse ffmpeg output for duration (appears in stderr)
-        output = result.stderr
-        log(f"🔍 ffmpeg output sample: {output[:300]}...")
-
-        for line in output.split('\n'):
-            if 'Duration:' in line:
-                duration_str = line.split('Duration: ')[1].split(',')[0].strip()
-                # Convert HH:MM:SS.ms to seconds
-                time_parts = duration_str.split(':')
-                if len(time_parts) == 3:
-                    hours = float(time_parts[0])
-                    minutes = float(time_parts[1])
-                    seconds = float(time_parts[2])
-                    total_seconds = hours * 3600 + minutes * 60 + seconds
-                    log(f"✅ Video duration: {total_seconds} seconds")
-                    return total_seconds
-
-        # If Duration line not found, try alternative approach using ffprobe
-        log("⚠️ No Duration found in ffmpeg output, trying ffprobe...")
-        cmd = [
-            "ffprobe", "-v", "quiet", "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1", url_str
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-        if result.returncode == 0 and result.stdout.strip():
-            duration = float(result.stdout.strip())
-            log(f"✅ Video duration (ffprobe): {duration} seconds")
-            return duration
-
-        log(f"❌ Could not extract duration from either ffmpeg or ffprobe")
-        return None
-
-    except subprocess.TimeoutExpired:
-        log("❌ Timeout - video URL may be inaccessible")
-        return None
-    except Exception as e:
-        log(f"❌ Error getting video duration: {e}")
-        return None
-
-
 def extract_screenshots(video_url, output_dir, num_screenshots=5):
-    """Extract screenshots from video using ffmpeg"""
+    """Extract 5 screenshots from video at fixed intervals using ffmpeg"""
     try:
         os.makedirs(output_dir, exist_ok=True)
 
         # Convert HttpUrl object to string if needed
         url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
+        log(f"📹 Extracting {num_screenshots} screenshots from video")
 
-        # Get video duration
-        duration = get_video_duration(url_str)
-        if not duration:
-            log("⚠️ Skipping screenshot extraction - no duration available")
-            return []
-
-        log(f"📹 Extracting {num_screenshots} screenshots from {duration}s video")
         screenshots = []
-        # Divide duration into segments and take screenshots at equal intervals
-        interval = duration / (num_screenshots + 1)
+        # Extract screenshots at fixed time intervals: 2s, 5s, 8s, 11s, 14s
+        timestamps = [2, 5, 8, 11, 14]
 
-        for i in range(1, num_screenshots + 1):
-            timestamp = interval * i
+        for i, timestamp in enumerate(timestamps, 1):
             output_path = os.path.join(output_dir, f"clip_{i}.jpg")
 
             cmd = [
@@ -149,9 +59,9 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if result.returncode == 0 and os.path.exists(output_path):
                 screenshots.append(output_path)
-                log(f"📸 Screenshot {i} saved: {output_path}")
+                log(f"📸 Screenshot {i} saved at {timestamp}s: {output_path}")
             else:
-                log(f"❌ ffmpeg error for screenshot {i} (code {result.returncode}): {result.stderr.strip()}")
+                log(f"❌ ffmpeg error for screenshot {i} at {timestamp}s (code {result.returncode}): {result.stderr.strip()}")
 
         log(f"✅ Successfully extracted {len(screenshots)} screenshots")
         return screenshots
@@ -222,11 +132,7 @@ def extract_media_data(media_msg, bot):
 
             # If we have a video URL, process it
             if video_url:
-                # Get duration
-                duration = get_video_duration(video_url)
-                media_data["duration"] = duration
-
-                # Extract screenshots
+                # Extract screenshots (no duration needed)
                 output_dir = os.path.join("output", "screenshots", media_msg.id)
                 screenshots = extract_screenshots(video_url, output_dir)
                 media_data["screenshots"] = screenshots
@@ -343,7 +249,6 @@ def main():
                             "media_type": media_data.get("item_type"),
                             "timestamp": media_data.get("timestamp"),
                             "caption": media_data.get("caption"),
-                            "duration": media_data.get("duration"),
                             "frames": media_data.get("screenshots", [])
                         }
 
