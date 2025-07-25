@@ -24,18 +24,27 @@ def load_json(filename):
         return {}
 
 
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if hasattr(obj, 'isoformat'):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
+
 def save_json(filename, data):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2, default=json_serial)
 
 
 def get_video_duration(video_url):
     """Get video duration using ffprobe"""
     try:
+        # Convert HttpUrl object to string if needed
+        url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
+        
         cmd = [
             "ffprobe", "-v", "error", "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1", video_url
+            "-of", "default=noprint_wrappers=1:nokey=1", url_str
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
@@ -53,8 +62,11 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
     try:
         os.makedirs(output_dir, exist_ok=True)
         
+        # Convert HttpUrl object to string if needed
+        url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
+        
         # Get video duration
-        duration = get_video_duration(video_url)
+        duration = get_video_duration(url_str)
         if not duration:
             return []
         
@@ -67,7 +79,7 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
             output_path = os.path.join(output_dir, f"clip_{i}.jpg")
             
             cmd = [
-                "ffmpeg", "-y", "-ss", str(timestamp), "-i", video_url,
+                "ffmpeg", "-y", "-ss", str(timestamp), "-i", url_str,
                 "-vframes", "1", "-q:v", "2", output_path
             ]
             
@@ -128,25 +140,28 @@ def extract_media_data(media_msg, bot):
             media_obj = media_msg.clip
         
         if media_obj:
-            # Extract video URL
+            # Extract video URL and convert to string
+            video_url = None
             if hasattr(media_obj, 'video_url') and media_obj.video_url:
-                media_data["video_url"] = media_obj.video_url
+                video_url = str(media_obj.video_url)
             elif hasattr(media_obj, 'video_versions') and media_obj.video_versions:
-                media_data["video_url"] = media_obj.video_versions[0].url
+                video_url = str(media_obj.video_versions[0].url)
+            
+            media_data["video_url"] = video_url
             
             # Extract other metadata
             media_data["caption"] = getattr(media_obj, 'caption', {}).get('text', '') if hasattr(media_obj, 'caption') else ''
             media_data["media_type"] = getattr(media_obj, 'media_type', None)
             
             # If we have a video URL, process it
-            if media_data["video_url"]:
+            if video_url:
                 # Get duration
-                duration = get_video_duration(media_data["video_url"])
+                duration = get_video_duration(video_url)
                 media_data["duration"] = duration
                 
                 # Extract screenshots
                 output_dir = os.path.join("output", "screenshots", media_msg.id)
-                screenshots = extract_screenshots(media_data["video_url"], output_dir)
+                screenshots = extract_screenshots(video_url, output_dir)
                 media_data["screenshots"] = screenshots
         
         return media_data
