@@ -47,21 +47,57 @@ def save_json(filename, data):
         json.dump(data, f, ensure_ascii=False, indent=2, default=json_serial)
 
 
-def extract_screenshots(video_url, output_dir, num_screenshots=5):
-    """Extract 5 screenshots from video by downloading first, then processing"""
+def detect_faces_in_image(image_path):
+    """Detect faces in an image using OpenCV"""
+    try:
+        import cv2
+        
+        # Load the image
+        image = cv2.imread(image_path)
+        if image is None:
+            log(f"❌ Could not load image: {image_path}")
+            return 0
+        
+        # Convert to grayscale for face detection
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Load the face detection classifier
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        
+        # Detect faces
+        faces = face_cascade.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(30, 30)
+        )
+        
+        num_faces = len(faces)
+        log(f"👤 Found {num_faces} face(s) in {os.path.basename(image_path)}")
+        return num_faces
+        
+    except ImportError:
+        log("❌ OpenCV not available, skipping face detection")
+        return 1  # Assume face is present if OpenCV is not available
+    except Exception as e:
+        log(f"❌ Error detecting faces in {image_path}: {e}")
+        return 0
+
+
+def extract_screenshots_intelligent(video_url, output_dir, num_screenshots=5):
+    """Extract meaningful screenshots using scene detection and face detection"""
     video_file = None
     try:
         os.makedirs(output_dir, exist_ok=True)
 
         url_str = str(video_url) if hasattr(video_url, '__str__') else video_url
-        log(f"📹 Extracting {num_screenshots} screenshots from video: {url_str}")
+        log(f"🧠 Intelligently extracting {num_screenshots} screenshots from video: {url_str}")
 
         # Download video file first
         video_file = os.path.join(output_dir, "input_video.mp4")
         log("⬇️ Downloading video...")
 
         try:
-            # Add headers to mimic a browser request
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             }
@@ -83,96 +119,213 @@ def extract_screenshots(video_url, output_dir, num_screenshots=5):
             log(f"❌ Failed to download video: {e}")
             return []
 
-        # Check if ffmpeg and ffprobe are available
+        # Check if ffmpeg is available
         try:
-            subprocess.run(["ffprobe", "-version"], capture_output=True, check=True)
             subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
-            log("✅ FFmpeg tools are available")
+            log("✅ FFmpeg is available")
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            log(f"❌ FFmpeg tools not available: {e}")
+            log(f"❌ FFmpeg not available: {e}")
             return []
 
-        # Get video duration using ffprobe
-        def get_duration(file_path):
-            try:
-                result = subprocess.run(
-                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                     "-of", "default=noprint_wrappers=1:nokey=1", file_path],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    timeout=30
-                )
-                log(f"📊 ffprobe result: returncode={result.returncode}, stdout='{result.stdout}', stderr='{result.stderr}'")
-                if result.returncode == 0 and result.stdout.strip():
-                    duration = float(result.stdout.strip())
-                    log(f"⏱️ Parsed duration: {duration}")
-                    return duration
-                return None
-            except Exception as e:
-                log(f"❌ Error getting duration: {e}")
-                return None
-
-        duration = get_duration(video_file)
-        if duration is None or duration <= 0:
-            log("⚠️ Could not get valid duration, using fixed timestamps")
-            # Fallback to fixed timestamps (assuming reasonable video length)
-            timestamps = [1, 3, 5, 7, 9]
+        # Step 1: Extract scene changes using FFmpeg
+        scene_dir = os.path.join(output_dir, "scenes")
+        os.makedirs(scene_dir, exist_ok=True)
+        
+        scene_pattern = os.path.join(scene_dir, "scene_%03d.jpg")
+        
+        log("🎬 Detecting scene changes...")
+        scene_cmd = [
+            "ffmpeg", "-i", video_file,
+            "-vf", "select='gt(scene,0.4)',showinfo",
+            "-vsync", "vfr",
+            "-q:v", "2",
+            scene_pattern,
+            "-y", "-hide_banner", "-loglevel", "info"
+        ]
+        
+        log(f"🔧 Running scene detection: {' '.join(scene_cmd)}")
+        scene_result = subprocess.run(scene_cmd, capture_output=True, text=True, timeout=120)
+        
+        if scene_result.returncode != 0:
+            log(f"⚠️ Scene detection failed, falling back to time-based extraction")
+            return extract_screenshots_fallback(video_file, output_dir, num_screenshots)
+        
+        # Find generated scene files
+        scene_files = []
+        for f in os.listdir(scene_dir):
+            if f.startswith("scene_") and f.endswith(".jpg"):
+                scene_path = os.path.join(scene_dir, f)
+                if os.path.getsize(scene_path) > 0:
+                    scene_files.append(scene_path)
+        
+        scene_files.sort()
+        log(f"🎭 Found {len(scene_files)} scene change frames")
+        
+        if len(scene_files) == 0:
+            log("⚠️ No scene changes detected, falling back to time-based extraction")
+            return extract_screenshots_fallback(video_file, output_dir, num_screenshots)
+        
+        # Step 2: Face detection on scene frames
+        face_frames = []
+        log("👤 Checking frames for human faces...")
+        
+        for scene_file in scene_files:
+            num_faces = detect_faces_in_image(scene_file)
+            if num_faces > 0:
+                face_frames.append({
+                    'path': scene_file,
+                    'faces': num_faces,
+                    'basename': os.path.basename(scene_file)
+                })
+        
+        log(f"😊 Found {len(face_frames)} frames with faces")
+        
+        # Step 3: Select the best frames
+        final_screenshots = []
+        
+        if len(face_frames) >= num_screenshots:
+            # We have enough face frames, select evenly distributed ones
+            indices = []
+            step = len(face_frames) / num_screenshots
+            for i in range(num_screenshots):
+                idx = int(i * step)
+                indices.append(idx)
+            
+            for i, idx in enumerate(indices):
+                old_path = face_frames[idx]['path']
+                new_path = os.path.join(output_dir, f"screenshot_{i+1}.jpg")
+                
+                # Copy the selected frame to final location
+                import shutil
+                shutil.copy2(old_path, new_path)
+                final_screenshots.append(new_path)
+                
+                log(f"🖼️ Selected screenshot_{i+1}.jpg with {face_frames[idx]['faces']} face(s)")
+        
+        elif len(face_frames) > 0:
+            # Use all face frames and fill remaining with scene frames
+            for i, frame in enumerate(face_frames):
+                if i >= num_screenshots:
+                    break
+                old_path = frame['path']
+                new_path = os.path.join(output_dir, f"screenshot_{i+1}.jpg")
+                
+                import shutil
+                shutil.copy2(old_path, new_path)
+                final_screenshots.append(new_path)
+                
+                log(f"🖼️ Selected screenshot_{i+1}.jpg with {frame['faces']} face(s)")
+            
+            # Fill remaining slots with non-face scene frames if needed
+            remaining_slots = num_screenshots - len(face_frames)
+            non_face_scenes = [f for f in scene_files if f not in [frame['path'] for frame in face_frames]]
+            
+            for i, scene_file in enumerate(non_face_scenes[:remaining_slots]):
+                shot_num = len(face_frames) + i + 1
+                new_path = os.path.join(output_dir, f"screenshot_{shot_num}.jpg")
+                
+                import shutil
+                shutil.copy2(scene_file, new_path)
+                final_screenshots.append(new_path)
+                
+                log(f"🖼️ Added screenshot_{shot_num}.jpg (scene change, no faces)")
+        
         else:
-            log(f"⏱️ Duration: {duration:.2f} seconds")
-            # Calculate evenly spaced timestamps, ensuring we don't go past the end
+            # No faces found, use first N scene frames
+            log("⚠️ No faces detected, using scene change frames")
+            for i, scene_file in enumerate(scene_files[:num_screenshots]):
+                new_path = os.path.join(output_dir, f"screenshot_{i+1}.jpg")
+                
+                import shutil
+                shutil.copy2(scene_file, new_path)
+                final_screenshots.append(new_path)
+                
+                log(f"🖼️ Selected screenshot_{i+1}.jpg (scene change)")
+        
+        # Clean up scene directory
+        import shutil
+        shutil.rmtree(scene_dir, ignore_errors=True)
+        
+        log(f"✅ Successfully extracted {len(final_screenshots)} intelligent screenshots")
+        return final_screenshots
+
+    except Exception as e:
+        log(f"❌ Error in intelligent extraction: {e}")
+        import traceback
+        log(f"📊 Traceback: {traceback.format_exc()}")
+        
+        # Fallback to time-based extraction
+        if video_file and os.path.exists(video_file):
+            return extract_screenshots_fallback(video_file, output_dir, num_screenshots)
+        return []
+    
+    finally:
+        # Always clean up the video file
+        if video_file and os.path.exists(video_file):
+            cleanup_video_file(video_file)
+
+
+def extract_screenshots_fallback(video_file, output_dir, num_screenshots=5):
+    """Fallback time-based screenshot extraction when scene detection fails"""
+    try:
+        log("🔄 Using fallback time-based extraction...")
+        
+        # Get video duration
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", video_file],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=30
+        )
+        
+        duration = None
+        if result.returncode == 0 and result.stdout.strip():
+            try:
+                duration = float(result.stdout.strip())
+            except ValueError:
+                pass
+        
+        if duration is None or duration <= 0:
+            # Use fixed timestamps
+            timestamps = [1, 3, 5, 7, 9][:num_screenshots]
+        else:
+            # Calculate evenly spaced timestamps
             if duration < num_screenshots:
-                # If video is very short, use smaller intervals
                 timestamps = [i * 0.5 for i in range(1, num_screenshots + 1) if i * 0.5 < duration]
             else:
                 interval = duration / (num_screenshots + 1)
                 timestamps = [interval * (i + 1) for i in range(num_screenshots)]
-
-        log(f"📍 Using timestamps: {timestamps}")
-
-        # Take screenshots
+        
         screenshots = []
-        log("📸 Taking screenshots...")
-
         for i, ts in enumerate(timestamps, 1):
             output_path = os.path.join(output_dir, f"screenshot_{i}.jpg")
-
+            
             cmd = [
                 "ffmpeg", "-ss", str(ts), "-i", video_file,
                 "-vframes", "1", "-q:v", "2", output_path,
                 "-y", "-hide_banner", "-loglevel", "warning"
             ]
-
-            log(f"🔧 Running: {' '.join(cmd)}")
+            
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-
-            log(f"📊 ffmpeg result for screenshot {i}: returncode={result.returncode}")
-            if result.stderr:
-                log(f"📊 ffmpeg stderr: {result.stderr}")
-
+            
             if result.returncode == 0 and os.path.exists(output_path):
                 file_size = os.path.getsize(output_path)
                 if file_size > 0:
                     screenshots.append(output_path)
-                    log(f"🖼️ Saved screenshot_{i}.jpg at {ts:.1f}s ({file_size} bytes)")
-                else:
-                    log(f"❌ Screenshot {i} file is empty")
-            else:
-                log(f"❌ Failed to create screenshot {i} at {ts:.1f}s")
-
-        log(f"✅ Successfully extracted {len(screenshots)} screenshots")
+                    log(f"🖼️ Fallback screenshot_{i}.jpg at {ts:.1f}s")
+        
         return screenshots
-
+        
     except Exception as e:
-        log(f"❌ Error extracting screenshots: {e}")
-        import traceback
-        log(f"📊 Traceback: {traceback.format_exc()}")
+        log(f"❌ Fallback extraction failed: {e}")
         return []
-    
-    finally:
-        # Always clean up the video file, even if an exception occurred
-        if video_file and os.path.exists(video_file):
-            cleanup_video_file(video_file)
+
+
+def extract_screenshots(video_url, output_dir, num_screenshots=5):
+    """Main screenshot extraction function - tries intelligent method first, falls back if needed"""
+    return extract_screenshots_intelligent(video_url, output_dir, num_screenshots)
 
 
 def find_previous_media_message(messages, trigger_msg_index):
