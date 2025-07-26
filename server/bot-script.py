@@ -404,17 +404,22 @@ TRIGGERS = ["whereclipped", "cliplive"]
 
 
 def main():
-    # Find the session file
-    session_files = list(pathlib.Path(".").glob("*_session.json"))
-    if not session_files:
-        log("❌ No session file found. Please log in first.")
+    try:
+        # Find the session file
+        session_files = list(pathlib.Path(".").glob("*_session.json"))
+        if not session_files:
+            log("❌ No session file found. Please log in first.")
+            return
+
+        session_file = session_files[0]
+        log(f"📁 Using session file: {session_file}")
+
+        bot = Client()
+        bot.load_settings(str(session_file))
+        log("✅ Instagram session loaded successfully")
+    except Exception as e:
+        log(f"❌ Failed to initialize bot: {e}")
         return
-
-    session_file = session_files[0]
-    log(f"📁 Using session file: {session_file}")
-
-    bot = Client()
-    bot.load_settings(str(session_file))
 
     TRACKER_FILE = "output/replied_messages_tracker.json"
     TRIGGER_MESSAGES_FILE = "output/trigger_messages.json"
@@ -434,9 +439,11 @@ def main():
 
     def safe_threads(amount=10):
         try:
-            return bot.direct_threads(amount=amount)
+            threads = bot.direct_threads(amount=amount)
+            log(f"📥 Fetched {len(threads)} threads successfully")
+            return threads
         except Exception as e:
-            log("⚠️ Could not fetch threads:", e)
+            log(f"⚠️ Could not fetch threads: {e}")
             return []
 
     def safe_username(user_id):
@@ -541,15 +548,27 @@ def main():
     # Main loop
     while True:
         try:
-            for thread in safe_threads(10):
+            threads = safe_threads(10)
+            log(f"🔍 Checking {len(threads)} threads for new messages...")
+            
+            for thread in threads:
                 if thread.messages:
-                    handle_new_dm(thread)
+                    try:
+                        handle_new_dm(thread)
+                    except Exception as e:
+                        log(f"❌ Error handling thread {thread.id}: {e}")
+                        continue
+            
+            log("💤 Waiting 15 seconds before next check...")
             time.sleep(15)
         except KeyboardInterrupt:
             log("🛑 Bot stopped by user.")
             break
         except Exception as e:
-            log("❌ Error in main loop:", e)
+            log(f"❌ Error in main loop: {e}")
+            import traceback
+            log(f"📊 Traceback: {traceback.format_exc()}")
+            log("⏳ Waiting 30 seconds before retry...")
             time.sleep(30)
 
 
